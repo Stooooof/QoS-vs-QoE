@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NetQoE — QoS / QoE Analyzer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Background grid -->
+    <div class="bg-grid"></div>
+    <div class="bg-glow"></div>
+
+    <div class="app">
+
+        <!-- SIDEBAR NAV -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <span class="logo-icon">◈</span>
+                <span class="logo-text">Net<strong>QoE</strong></span>
+            </div>
+            <nav class="sidebar-nav">
+                <button class="nav-item active" onclick="switchTab('dashboard', this)">
+                    <span class="nav-icon">⬡</span>
+                    <span>Dashboard</span>
+                </button>
+                <button class="nav-item" onclick="switchTab('simulateur', this)">
+                    <span class="nav-icon">◎</span>
+                    <span>Simulateur</span>
+                </button>
+                <button class="nav-item" onclick="switchTab('historique', this)">
+                    <span class="nav-icon">▤</span>
+                    <span>Historique</span>
+                </button>
+                <button class="nav-item" onclick="switchTab('info', this)">
+                    <span class="nav-icon">◉</span>
+                    <span>QoS vs QoE</span>
+                </button>
+            </nav>
+            <div class="sidebar-actions">
+                <button onclick="lancerMesure()" class="btn-measure" id="btn-mesure">
+                    <span class="btn-icon">▶</span>
+                    <span class="btn-text">Lancer mesure</span>
+                </button>
+                <button onclick="toggleAuto()" class="btn-auto" id="btn-auto">
+                    <span id="auto-icon">◷</span>
+                    <span id="auto-label">Auto 30s</span>
+                </button>
+            </div>
+            <div class="sidebar-status">
+                <div class="status-dot" id="status-dot"></div>
+                <span id="status-text">Prêt</span>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="main">
+
+            <!-- DASHBOARD -->
+            <div id="tab-dashboard" class="tab-content active">
+                <div class="page-header">
+                    <h1>Dashboard <span class="tag">Live</span></h1>
+                    <p class="subtitle">Métriques réseau en temps réel</p>
+                </div>
+
+                <!-- QoS Metrics Row -->
+                <div class="section-label">◈ Qualité de Service — réseau</div>
+                <div class="qos-row">
+                    <div class="metric-card" id="card-latence">
+                        <div class="metric-top">
+                            <span class="metric-name">Latence</span>
+                            <span class="metric-badge" id="badge-latence">—</span>
+                        </div>
+                        <div class="metric-value"><span id="val-latence">—</span><span class="metric-unit">ms</span></div>
+                        <div class="metric-bar"><div class="metric-bar-fill" id="bar-latence"></div></div>
+                    </div>
+                    <div class="metric-card" id="card-jitter">
+                        <div class="metric-top">
+                            <span class="metric-name">Jitter</span>
+                            <span class="metric-badge" id="badge-jitter">—</span>
+                        </div>
+                        <div class="metric-value"><span id="val-jitter">—</span><span class="metric-unit">ms</span></div>
+                        <div class="metric-bar"><div class="metric-bar-fill" id="bar-jitter"></div></div>
+                    </div>
+                    <div class="metric-card" id="card-perte">
+                        <div class="metric-top">
+                            <span class="metric-name">Perte paquets</span>
+                            <span class="metric-badge" id="badge-perte">—</span>
+                        </div>
+                        <div class="metric-value"><span id="val-perte">—</span><span class="metric-unit">%</span></div>
+                        <div class="metric-bar"><div class="metric-bar-fill" id="bar-perte"></div></div>
+                    </div>
+                    <div class="metric-card debit-card">
+                        <div class="metric-top">
+                            <span class="metric-name">Débit</span>
+                        </div>
+                        <div class="debit-split">
+                            <div>
+                                <div class="debit-label">↓ Download</div>
+                                <div class="debit-val"><span id="val-debit-down">—</span> <span class="metric-unit">Mbps</span></div>
+                            </div>
+                            <div class="debit-sep"></div>
+                            <div>
+                                <div class="debit-label">↑ Upload</div>
+                                <div class="debit-val"><span id="val-debit-up">—</span> <span class="metric-unit">Mbps</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- QoE Gauges -->
+                <div class="section-label">◉ Qualité d'Expérience — utilisateur</div>
+                <div class="qoe-row">
+                    <div class="qoe-card" id="qoe-voip">
+                        <div class="qoe-header">
+                            <span class="qoe-emoji">📞</span>
+                            <span class="qoe-title">VoIP / Appels</span>
+                        </div>
+                        <div class="gauge-wrap">
+                            <svg class="gauge-svg" viewBox="0 0 120 70">
+                                <path class="gauge-track" d="M 10 65 A 50 50 0 0 1 110 65" fill="none" stroke-width="10" stroke-linecap="round"/>
+                                <path class="gauge-fill" id="gauge-voip" d="M 10 65 A 50 50 0 0 1 110 65" fill="none" stroke-width="10" stroke-linecap="round" stroke-dasharray="157" stroke-dashoffset="157"/>
+                            </svg>
+                            <div class="gauge-value" id="score-voip">—</div>
+                            <div class="gauge-label" id="label-voip">MOS</div>
+                        </div>
+                        <div class="qoe-verdict" id="verdict-voip">En attente...</div>
+                    </div>
+                    <div class="qoe-card" id="qoe-video">
+                        <div class="qoe-header">
+                            <span class="qoe-emoji">🎬</span>
+                            <span class="qoe-title">Streaming Vidéo</span>
+                        </div>
+                        <div class="gauge-wrap">
+                            <svg class="gauge-svg" viewBox="0 0 120 70">
+                                <path class="gauge-track" d="M 10 65 A 50 50 0 0 1 110 65" fill="none" stroke-width="10" stroke-linecap="round"/>
+                                <path class="gauge-fill" id="gauge-video" d="M 10 65 A 50 50 0 0 1 110 65" fill="none" stroke-width="10" stroke-linecap="round" stroke-dasharray="157" stroke-dashoffset="157"/>
+                            </svg>
+                            <div class="gauge-value" id="score-video">—</div>
+                            <div class="gauge-label" id="label-video">QoE</div>
+                        </div>
+                        <div class="qoe-verdict" id="verdict-video">En attente...</div>
+                    </div>
+                    <div class="qoe-card" id="qoe-gaming">
+                        <div class="qoe-header">
+                            <span class="qoe-emoji">🎮</span>
+                            <span class="qoe-title">Gaming en ligne</span>
+                        </div>
+                        <div class="gauge-wrap">
+                            <svg class="gauge-svg" viewBox="0 0 120 70">
+                                <path class="gauge-track" d="M 10 65 A 50 50 0 0 1 110 65" fill="none" stroke-width="10" stroke-linecap="round"/>
+                                <path class="gauge-fill" id="gauge-gaming" d="M 10 65 A 50 50 0 0 1 110 65" fill="none" stroke-width="10" stroke-linecap="round" stroke-dasharray="157" stroke-dashoffset="157"/>
+                            </svg>
+                            <div class="gauge-value" id="score-gaming">—</div>
+                            <div class="gauge-label" id="label-gaming">QoE</div>
+                        </div>
+                        <div class="qoe-verdict" id="verdict-gaming">En attente...</div>
+                    </div>
+                </div>
+
+                <!-- Chart -->
+                <div class="chart-panel">
+                    <div class="chart-header">
+                        <span class="section-label" style="margin:0">◈ Évolution temporelle QoS → QoE</span>
+                        <div class="chart-legend">
+                            <span class="legend-dot" style="background:#00d4ff"></span> Latence
+                            <span class="legend-dot" style="background:#a855f7"></span> MOS VoIP
+                            <span class="legend-dot" style="background:#22c55e"></span> QoE Vidéo
+                        </div>
+                    </div>
+                    <canvas id="chartRealtime" height="90"></canvas>
+                </div>
+            </div>
+
+            <!-- SIMULATEUR -->
+            <div id="tab-simulateur" class="tab-content">
+                <div class="page-header">
+                    <h1>Simulateur <span class="tag">Interactif</span></h1>
+                    <p class="subtitle">Sélectionnez un scénario ou ajustez manuellement les paramètres réseau</p>
+                </div>
+
+                <!-- SCENARIO TABLE -->
+                <div class="scenario-panel">
+                    <div class="section-label">◈ Scénarios réseau — cliquez pour tester</div>
+                    <div class="scenario-table-wrap">
+                        <table class="scenario-table" id="scenario-table">
+                            <thead>
+                                <tr>
+                                    <th>Scénario</th>
+                                    <th>Latence</th>
+                                    <th>Jitter</th>
+                                    <th>Perte</th>
+                                    <th>Débit</th>
+                                    <th>MOS VoIP</th>
+                                    <th>QoE Vidéo</th>
+                                    <th>QoE Gaming</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="scenario-tbody">
+                                <!-- Rempli par JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- MANUAL + RESULTS -->
+                <div class="sim-layout">
+                    <div class="sim-controls-panel">
+                        <div class="section-label">◉ Paramètres manuels</div>
+                        <div class="active-scenario-badge" id="active-scenario-badge" style="display:none">
+                            <span id="active-scenario-name">—</span>
+                            <button onclick="clearScenario()">✕</button>
+                        </div>
+                        <div class="slider-list">
+                            <div class="slider-item">
+                                <div class="slider-header">
+                                    <span>Latence</span>
+                                    <span class="slider-val" id="sim-latence-val">10 ms</span>
+                                </div>
+                                <div class="slider-track">
+                                    <input type="range" id="sim-latence" min="1" max="700" value="10" oninput="onSliderChange()">
+                                    <div class="slider-zones">
+                                        <span class="zone excellent">≤30ms</span>
+                                        <span class="zone bon">≤80ms</span>
+                                        <span class="zone moyen">≤150ms</span>
+                                        <span class="zone mauvais">&gt;150ms</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="slider-item">
+                                <div class="slider-header">
+                                    <span>Jitter</span>
+                                    <span class="slider-val" id="sim-jitter-val">1 ms</span>
+                                </div>
+                                <input type="range" id="sim-jitter" min="0" max="200" value="1" oninput="onSliderChange()">
+                            </div>
+                            <div class="slider-item">
+                                <div class="slider-header">
+                                    <span>Perte de paquets</span>
+                                    <span class="slider-val" id="sim-perte-val">0 %</span>
+                                </div>
+                                <input type="range" id="sim-perte" min="0" max="20" value="0" step="0.5" oninput="onSliderChange()">
+                            </div>
+                            <div class="slider-item">
+                                <div class="slider-header">
+                                    <span>Débit descendant</span>
+                                    <span class="slider-val" id="sim-debit-val">500 Mbps</span>
+                                </div>
+                                <input type="range" id="sim-debit" min="1" max="600" value="500" oninput="onSliderChange()">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sim-results-panel">
+                        <div class="section-label">◉ Résultats QoE calculés</div>
+                        <div class="sim-results">
+                            <div class="sim-result-card">
+                                <div class="sim-result-icon">📞</div>
+                                <div class="sim-result-name">VoIP MOS</div>
+                                <div class="sim-result-score" id="sim-mos">—</div>
+                                <div class="sim-result-bar"><div id="sim-bar-mos"></div></div>
+                                <div class="sim-result-label" id="sim-label-mos">—</div>
+                            </div>
+                            <div class="sim-result-card">
+                                <div class="sim-result-icon">🎬</div>
+                                <div class="sim-result-name">Vidéo QoE</div>
+                                <div class="sim-result-score" id="sim-video">—</div>
+                                <div class="sim-result-bar"><div id="sim-bar-video"></div></div>
+                                <div class="sim-result-label" id="sim-label-video">—</div>
+                            </div>
+                            <div class="sim-result-card">
+                                <div class="sim-result-icon">🎮</div>
+                                <div class="sim-result-name">Gaming QoE</div>
+                                <div class="sim-result-score" id="sim-gaming">—</div>
+                                <div class="sim-result-bar"><div id="sim-bar-gaming"></div></div>
+                                <div class="sim-result-label" id="sim-label-gaming">—</div>
+                            </div>
+                        </div>
+                        <div class="radar-wrap">
+                            <canvas id="radarChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- HISTORIQUE -->
+            <div id="tab-historique" class="tab-content">
+                <div class="page-header">
+                    <h1>Historique <span class="tag">SQLite</span></h1>
+                    <p class="subtitle">50 dernières mesures enregistrées</p>
+                </div>
+
+                <div class="stats-row" id="stats-container"></div>
+
+                <div class="table-panel">
+                    <div class="section-label">◈ Mesures récentes</div>
+                    <div class="table-wrap">
+                        <table id="history-table">
+                            <thead>
+                                <tr>
+                                    <th>Horodatage</th>
+                                    <th>Latence</th>
+                                    <th>Jitter</th>
+                                    <th>Perte %</th>
+                                    <th>↓ Mbps</th>
+                                    <th>MOS VoIP</th>
+                                    <th>QoE Vidéo</th>
+                                    <th>QoE Gaming</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- INFO QoS vs QoE -->
+            <div id="tab-info" class="tab-content">
+                <div class="page-header">
+                    <h1>QoS vs QoE <span class="tag">Théorie</span></h1>
+                    <p class="subtitle">Comprendre la différence entre mesure réseau et expérience utilisateur</p>
+                </div>
+
+                <div class="info-layout">
+                    <div class="info-card qos-card">
+                        <div class="info-card-header">
+                            <span class="info-icon">📡</span>
+                            <h2>QoS</h2>
+                            <span class="info-subtitle">Qualité de Service</span>
+                        </div>
+                        <ul class="info-list">
+                            <li>Mesures <strong>objectives</strong> et techniques</li>
+                            <li>Latence, jitter, perte de paquets, débit</li>
+                            <li>Mesurée par les équipements réseau</li>
+                            <li>Définie par des seuils normés (ITU-T, ETSI)</li>
+                            <li>Indépendante du service applicatif</li>
+                        </ul>
+                        <div class="info-metrics">
+                            <div class="info-metric"><strong>&lt;50ms</strong><span>Latence idéale</span></div>
+                            <div class="info-metric"><strong>&lt;5ms</strong><span>Jitter idéal</span></div>
+                            <div class="info-metric"><strong>&lt;1%</strong><span>Perte idéale</span></div>
+                        </div>
+                    </div>
+
+                    <div class="info-arrow">
+                        <div class="arrow-line"></div>
+                        <div class="arrow-label">transformation<br>en ressenti</div>
+                        <div class="arrow-head">→</div>
+                    </div>
+
+                    <div class="info-card qoe-card">
+                        <div class="info-card-header">
+                            <span class="info-icon">😊</span>
+                            <h2>QoE</h2>
+                            <span class="info-subtitle">Qualité d'Expérience</span>
+                        </div>
+                        <ul class="info-list">
+                            <li>Perception <strong>subjective</strong> de l'utilisateur</li>
+                            <li>Score MOS (1–5), satisfaction, frustration</li>
+                            <li>Varie selon le service (VoIP, vidéo, gaming)</li>
+                            <li>Modélisée par E-model (G.107), VMAF, etc.</li>
+                            <li>L'objectif final : l'utilisateur satisfait</li>
+                        </ul>
+                        <div class="info-metrics">
+                            <div class="info-metric"><strong>≥4.0</strong><span>MOS excellent</span></div>
+                            <div class="info-metric"><strong>3.5–4</strong><span>MOS bon</span></div>
+                            <div class="info-metric"><strong>&lt;3.0</strong><span>MOS dégradé</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mos-table-panel">
+                    <div class="section-label">◈ Grille MOS ITU-T P.800</div>
+                    <table class="mos-table">
+                        <thead><tr><th>Score MOS</th><th>Qualité</th><th>Ressenti utilisateur</th><th>Usage VoIP</th></tr></thead>
+                        <tbody>
+                            <tr class="mos-5"><td>4.5 – 5.0</td><td>Excellent</td><td>Imperceptible</td><td>Visioconférence HD</td></tr>
+                            <tr class="mos-4"><td>4.0 – 4.5</td><td>Bon</td><td>Légèrement perceptible</td><td>Appels professionnels</td></tr>
+                            <tr class="mos-3"><td>3.5 – 4.0</td><td>Correct</td><td>Perceptible mais acceptable</td><td>Téléphonie grand public</td></tr>
+                            <tr class="mos-2"><td>3.0 – 3.5</td><td>Passable</td><td>Légèrement gênant</td><td>Limite acceptable</td></tr>
+                            <tr class="mos-1"><td>&lt; 3.0</td><td>Mauvais</td><td>Très gênant</td><td>Inacceptable</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+    // ============ STATE ============
+    let chartInstance = null;
+    let radarInstance = null;
+    let autoInterval = null;
+
+    // ============ INIT ============
+    document.addEventListener('DOMContentLoaded', () => {
+        initChart();
+        initRadar();
+        updateSimulator();
+        buildScenarioTable();
+        loadHistorique();
+    });
+
+    // ============ TABS ============
+    function switchTab(name, el) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+        document.getElementById('tab-' + name).classList.add('active');
+        el.classList.add('active');
+        if (name === 'historique') loadHistorique();
+    }
+
+    // ============ MESURE ============
+    async function lancerMesure() {
+        const btn = document.getElementById('btn-mesure');
+        btn.classList.add('loading');
+        btn.querySelector('.btn-icon').textContent = '◌';
+        btn.querySelector('span:last-child').textContent = 'Mesure...';
+        btn.disabled = true;
+        setStatus('Mesure en cours...', 'measuring');
+
+        try {
+            const res = await fetch('/api/mesure');
+            const data = await res.json();
+            if (data.error) {
+                setStatus('Erreur: ' + data.error, 'error');
+                showToast('❌ ' + data.error, 'error');
+                return;
+            }
+            updateDisplay(data);
+            addToChart(data);
+            setStatus('Dernière mesure: ' + new Date().toLocaleTimeString(), 'ok');
+            showToast('✅ Mesure effectuée avec succès', 'success');
+        } catch(e) {
+            setStatus('Erreur de connexion', 'error');
+            showToast('❌ Impossible de contacter le serveur', 'error');
+        } finally {
+            btn.classList.remove('loading');
+            btn.querySelector('.btn-icon').textContent = '▶';
+            btn.querySelector('span:last-child').textContent = 'Lancer mesure';
+            btn.disabled = false;
+        }
+    }
+
+    function setStatus(msg, state) {
+        document.getElementById('status-text').textContent = msg;
+        const dot = document.getElementById('status-dot');
+        dot.className = 'status-dot ' + state;
+    }
+
+    function showToast(msg, type) {
+        const t = document.createElement('div');
+        t.className = 'toast ' + type;
+        t.textContent = msg;
+        document.body.appendChild(t);
+        setTimeout(() => t.classList.add('show'), 10);
+        setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 3000);
+    }
+
+    // ============ DISPLAY ============
+    function updateDisplay(data) {
+        const q = data.qos;
+        // QoS values
+        animateValue('val-latence', q.latence_ms);
+        animateValue('val-jitter', q.jitter_ms);
+        animateValue('val-perte', q.perte_pourcent);
+        animateValue('val-debit-down', q.debit_down_mbps);
+        animateValue('val-debit-up', q.debit_up_mbps);
+
+        // Bars + badges for latence
+        updateMetricBar('bar-latence', 'badge-latence', 'card-latence', q.latence_ms, [50, 100, 200]);
+        updateMetricBar('bar-jitter', 'badge-jitter', 'card-jitter', q.jitter_ms, [5, 15, 30]);
+        updateMetricBar('bar-perte', 'badge-perte', 'card-perte', q.perte_pourcent, [1, 3, 7]);
+
+        // QoE
+        updateGauge('gauge-voip', 'score-voip', 'verdict-voip', data.qoe.mos_voip);
+        updateGauge('gauge-video', 'score-video', 'verdict-video', data.qoe.qoe_video);
+        updateGauge('gauge-gaming', 'score-gaming', 'verdict-gaming', data.qoe.qoe_gaming);
+    }
+
+    function animateValue(id, target) {
+        const el = document.getElementById(id);
+        el.classList.add('update-flash');
+        el.textContent = target;
+        setTimeout(() => el.classList.remove('update-flash'), 600);
+    }
+
+    function updateMetricBar(barId, badgeId, cardId, value, thresholds) {
+        const bar = document.getElementById(barId);
+        const badge = document.getElementById(badgeId);
+        const card = document.getElementById(cardId);
+        let cls, label, pct;
+        if (value <= thresholds[0]) { cls = 'excellent'; label = 'Excellent'; pct = (value / thresholds[0]) * 25; }
+        else if (value <= thresholds[1]) { cls = 'bon'; label = 'Bon'; pct = 25 + ((value - thresholds[0]) / (thresholds[1] - thresholds[0])) * 25; }
+        else if (value <= thresholds[2]) { cls = 'moyen'; label = 'Moyen'; pct = 50 + ((value - thresholds[1]) / (thresholds[2] - thresholds[1])) * 25; }
+        else { cls = 'mauvais'; label = 'Mauvais'; pct = Math.min(100, 75 + ((value - thresholds[2]) / thresholds[2]) * 25); }
+        bar.style.width = pct + '%';
+        bar.className = 'metric-bar-fill ' + cls;
+        badge.textContent = label;
+        badge.className = 'metric-badge ' + cls;
+        card.className = 'metric-card ' + cls + '-card';
+    }
+
+    function updateGauge(gaugeId, scoreId, verdictId, score) {
+        const arc = 157; // half-circle arc length
+        const offset = arc - (score / 5) * arc;
+        const gaugeEl = document.getElementById(gaugeId);
+        gaugeEl.style.strokeDashoffset = offset;
+        const cls = score >= 4 ? 'excellent' : score >= 3 ? 'bon' : score >= 2 ? 'moyen' : 'mauvais';
+        gaugeEl.className = 'gauge-fill ' + cls;
+        document.getElementById(scoreId).textContent = score.toFixed(1);
+        document.getElementById(verdictId).textContent = getLabel(score);
+        document.getElementById(verdictId).className = 'qoe-verdict ' + cls;
+    }
+
+    function getLabel(s) {
+        if (s >= 4.5) return '✦ Excellent';
+        if (s >= 4.0) return '◆ Bon';
+        if (s >= 3.5) return '◇ Correct';
+        if (s >= 3.0) return '▽ Passable';
+        if (s >= 2.0) return '▼ Mauvais';
+        return '✖ Inacceptable';
+    }
+
+    function getScoreColor(s) {
+        if (s >= 4) return '#22c55e';
+        if (s >= 3) return '#3b82f6';
+        if (s >= 2) return '#f59e0b';
+        return '#ef4444';
+    }
+
+    // ============ CHART ============
+    function initChart() {
+        const ctx = document.getElementById('chartRealtime').getContext('2d');
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    { label: 'Latence (ms)', data: [], borderColor: '#00d4ff', backgroundColor: 'rgba(0,212,255,0.05)', yAxisID: 'y', tension: 0.4, pointRadius: 4, pointHoverRadius: 6 },
+                    { label: 'MOS VoIP', data: [], borderColor: '#a855f7', backgroundColor: 'rgba(168,85,247,0.05)', yAxisID: 'y1', tension: 0.4, pointRadius: 4 },
+                    { label: 'QoE Vidéo', data: [], borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.05)', yAxisID: 'y1', tension: 0.4, pointRadius: 4 }
+                ]
+            },
+            options: {
+                responsive: true,
+                animation: { duration: 600 },
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { ticks: { color: '#6b7280', font: { family: 'Space Mono', size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    y: { type: 'linear', position: 'left', title: { display: true, text: 'Latence (ms)', color: '#00d4ff', font: { family: 'Space Mono', size: 10 } }, ticks: { color: '#6b7280' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    y1: { type: 'linear', position: 'right', min: 1, max: 5, title: { display: true, text: 'Score MOS (1–5)', color: '#a855f7', font: { family: 'Space Mono', size: 10 } }, ticks: { color: '#6b7280' }, grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    function addToChart(data) {
+        const t = new Date().toLocaleTimeString('fr', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        chartInstance.data.labels.push(t);
+        chartInstance.data.datasets[0].data.push(data.qos.latence_ms);
+        chartInstance.data.datasets[1].data.push(data.qoe.mos_voip);
+        chartInstance.data.datasets[2].data.push(data.qoe.qoe_video);
+        if (chartInstance.data.labels.length > 20) {
+            chartInstance.data.labels.shift();
+            chartInstance.data.datasets.forEach(d => d.data.shift());
+        }
+        chartInstance.update();
+    }
+
+    // ============ RADAR ============
+    function initRadar() {
+        const ctx = document.getElementById('radarChart').getContext('2d');
+        radarInstance = new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: ['VoIP MOS', 'Vidéo QoE', 'Gaming QoE'],
+                datasets: [{
+                    label: 'Score QoE',
+                    data: [0, 0, 0],
+                    borderColor: '#a855f7',
+                    backgroundColor: 'rgba(168,85,247,0.15)',
+                    pointBackgroundColor: '#a855f7',
+                    pointRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: { r: { min: 0, max: 5, ticks: { stepSize: 1, color: '#6b7280', backdropColor: 'transparent' }, grid: { color: 'rgba(255,255,255,0.1)' }, pointLabels: { color: '#9ca3af', font: { family: 'DM Sans', size: 12 } } } },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+
+    // ============ AUTO ============
+    function toggleAuto() {
+        const icon = document.getElementById('auto-icon');
+        const label = document.getElementById('auto-label');
+        const btn = document.getElementById('btn-auto');
+        if (autoInterval) {
+            clearInterval(autoInterval);
+            autoInterval = null;
+            icon.textContent = '◷';
+            label.textContent = 'Auto 30s';
+            btn.classList.remove('active');
+        } else {
+            lancerMesure();
+            autoInterval = setInterval(lancerMesure, 30000);
+            icon.textContent = '⏹';
+            label.textContent = 'Arrêter';
+            btn.classList.add('active');
+        }
+    }
+
+    // ============ SCENARIOS ============
+    const SCENARIOS = [
+        { name: '🔵 Fibre idéale',       icon: '🔵', lat: 5,   jit: 0,   per: 0,    deb: 500 },
+        { name: '🟢 Fibre standard',      icon: '🟢', lat: 10,  jit: 1,   per: 0,    deb: 100 },
+        { name: '🟢 Cable / FTTH',        icon: '🟢', lat: 20,  jit: 2,   per: 0,    deb: 50  },
+        { name: '🟡 VDSL2 bon',           icon: '🟡', lat: 30,  jit: 5,   per: 0.5,  deb: 30  },
+        { name: '🟡 ADSL2+',             icon: '🟡', lat: 50,  jit: 10,  per: 1,    deb: 15  },
+        { name: '🟠 ADSL moyen',          icon: '🟠', lat: 80,  jit: 15,  per: 2,    deb: 8   },
+        { name: '🟢 4G/LTE bon',          icon: '🟢', lat: 40,  jit: 20,  per: 1,    deb: 25  },
+        { name: '🟠 4G congestionnée',    icon: '🟠', lat: 100, jit: 50,  per: 3,    deb: 10  },
+        { name: '🔴 Satellite',           icon: '🔴', lat: 600, jit: 100, per: 5,    deb: 20  },
+        { name: '🔴 WiFi saturé',         icon: '🔴', lat: 200, jit: 80,  per: 8,    deb: 5   },
+        { name: '🔴 Réseau instable',     icon: '🔴', lat: 300, jit: 150, per: 15,   deb: 2   },
+    ];
+
+    let activeScenarioIndex = null;
+
+    async function buildScenarioTable() {
+        const tbody = document.getElementById('scenario-tbody');
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:20px">Calcul en cours...</td></tr>';
+
+        // Récupère tous les QoE en parallèle
+        const results = await Promise.all(SCENARIOS.map(s =>
+            fetch('/api/simuler', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ latence: s.lat, jitter: s.jit, perte: s.per, debit: s.deb })
+            }).then(r => r.json()).catch(() => null)
+        ));
+
+        tbody.innerHTML = '';
+        SCENARIOS.forEach((s, i) => {
+            const q = results[i]?.qoe;
+            const mos   = q ? q.mos_voip  : '—';
+            const vid   = q ? q.qoe_video  : '—';
+            const gam   = q ? q.qoe_gaming : '—';
+
+            const scoreCell = (v) => {
+                if (v === '—') return '<td>—</td>';
+                const cls = v >= 4 ? 'excellent' : v >= 3 ? 'bon' : v >= 2 ? 'moyen' : 'mauvais';
+                return `<td class="${cls}">${Number(v).toFixed(1)}</td>`;
+            };
+
+            const latCls = s.lat <= 30 ? 'excellent' : s.lat <= 80 ? 'bon' : s.lat <= 150 ? 'moyen' : 'mauvais';
+            const jitCls = s.jit <= 5  ? 'excellent' : s.jit <= 20 ? 'bon' : s.jit <= 50  ? 'moyen' : 'mauvais';
+            const perCls = s.per <= 0.5? 'excellent' : s.per <= 2  ? 'bon' : s.per <= 5   ? 'moyen' : 'mauvais';
+
+            const tr = document.createElement('tr');
+            tr.className = 'scenario-row';
+            tr.id = `scenario-row-${i}`;
+            tr.innerHTML = `
+                <td class="scenario-name">${s.name}</td>
+                <td class="${latCls}">${s.lat} ms</td>
+                <td class="${jitCls}">${s.jit} ms</td>
+                <td class="${perCls}">${s.per}%</td>
+                <td>${s.deb} Mbps</td>
+                ${scoreCell(mos)}
+                ${scoreCell(vid)}
+                ${scoreCell(gam)}
+                <td><button class="apply-btn" onclick="applyScenario(${i})">▶ Tester</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function applyScenario(i) {
+        const s = SCENARIOS[i];
+        document.getElementById('sim-latence').value = s.lat;
+        document.getElementById('sim-jitter').value  = s.jit;
+        document.getElementById('sim-perte').value   = s.per;
+        document.getElementById('sim-debit').value   = s.deb;
+
+        // Highlight row
+        document.querySelectorAll('.scenario-row').forEach(r => r.classList.remove('active-row'));
+        const row = document.getElementById(`scenario-row-${i}`);
+        if (row) row.classList.add('active-row');
+
+        // Badge
+        activeScenarioIndex = i;
+        const badge = document.getElementById('active-scenario-badge');
+        badge.style.display = 'flex';
+        document.getElementById('active-scenario-name').textContent = s.name;
+
+        updateSimulator();
+
+        // Scroll vers les résultats
+        document.querySelector('.sim-layout').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function clearScenario() {
+        activeScenarioIndex = null;
+        document.getElementById('active-scenario-badge').style.display = 'none';
+        document.querySelectorAll('.scenario-row').forEach(r => r.classList.remove('active-row'));
+    }
+
+    function onSliderChange() {
+        // Si on bouge manuellement, on désactive le scénario actif
+        clearScenario();
+        updateSimulator();
+    }
+
+    // ============ SIMULATOR ============
+    async function updateSimulator() {
+        const latence = +document.getElementById('sim-latence').value;
+        const jitter  = +document.getElementById('sim-jitter').value;
+        const perte   = +document.getElementById('sim-perte').value;
+        const debit   = +document.getElementById('sim-debit').value;
+
+        document.getElementById('sim-latence-val').textContent = latence + ' ms';
+        document.getElementById('sim-jitter-val').textContent  = jitter  + ' ms';
+        document.getElementById('sim-perte-val').textContent   = perte   + ' %';
+        document.getElementById('sim-debit-val').textContent   = debit   + ' Mbps';
+
+        try {
+            const res = await fetch('/api/simuler', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ latence, jitter, perte, debit })
+            });
+            const data = await res.json();
+            const q = data.qoe;
+
+            updateSimResult('sim-mos',    'sim-bar-mos',    'sim-label-mos',    q.mos_voip);
+            updateSimResult('sim-video',  'sim-bar-video',  'sim-label-video',  q.qoe_video);
+            updateSimResult('sim-gaming', 'sim-bar-gaming', 'sim-label-gaming', q.qoe_gaming);
+
+            if (radarInstance) {
+                radarInstance.data.datasets[0].data = [q.mos_voip, q.qoe_video, q.qoe_gaming];
+                radarInstance.update();
+            }
+        } catch(e) {}
+    }
+
+    function updateSimResult(scoreId, barId, labelId, score) {
+        const cls = score >= 4 ? 'excellent' : score >= 3 ? 'bon' : score >= 2 ? 'moyen' : 'mauvais';
+        document.getElementById(scoreId).textContent = score.toFixed(1) + ' / 5';
+        document.getElementById(scoreId).className   = 'sim-result-score ' + cls;
+        const bar = document.getElementById(barId);
+        bar.style.width = (score / 5 * 100) + '%';
+        bar.className = cls;
+        document.getElementById(labelId).textContent = getLabel(score);
+    }
+
+    // ============ HISTORIQUE ============
+    async function loadHistorique() {
+        try {
+            const [histRes, statsRes] = await Promise.all([fetch('/api/historique'), fetch('/api/stats')]);
+            const hist = await histRes.json();
+            const stats = await statsRes.json();
+
+            // Stats boxes
+            const container = document.getElementById('stats-container');
+            container.innerHTML = `
+                <div class="stat-box"><span class="stat-n">${stats.total_mesures}</span><span class="stat-l">Mesures totales</span></div>
+                <div class="stat-box"><span class="stat-n">${stats.moyennes.latence_ms}<small>ms</small></span><span class="stat-l">Latence moyenne</span></div>
+                <div class="stat-box"><span class="stat-n">${stats.moyennes.mos_voip}</span><span class="stat-l">MOS VoIP moyen</span></div>
+                <div class="stat-box"><span class="stat-n">${stats.moyennes.qoe_video}</span><span class="stat-l">QoE Vidéo moy.</span></div>
+                <div class="stat-box"><span class="stat-n">${stats.moyennes.qoe_gaming}</span><span class="stat-l">QoE Gaming moy.</span></div>
+            `;
+
+            // Table
+            const tbody = document.querySelector('#history-table tbody');
+            tbody.innerHTML = '';
+            hist.forEach(row => {
+                const cls = s => s >= 4 ? 'excellent' : s >= 3 ? 'bon' : s >= 2 ? 'moyen' : 'mauvais';
+                tbody.innerHTML += `<tr>
+                    <td>${new Date(row.timestamp).toLocaleString('fr')}</td>
+                    <td>${row.latence} ms</td>
+                    <td>${row.jitter ?? '—'} ms</td>
+                    <td>${row.perte ?? '—'} %</td>
+                    <td>${row.debit_down ?? '—'}</td>
+                    <td class="${cls(row.mos_voip)}">${row.mos_voip}</td>
+                    <td class="${cls(row.qoe_video)}">${row.qoe_video}</td>
+                    <td class="${cls(row.qoe_gaming)}">${row.qoe_gaming}</td>
+                </tr>`;
+            });
+        } catch(e) {}
+    }
+    </script>
+</body>
+</html>
