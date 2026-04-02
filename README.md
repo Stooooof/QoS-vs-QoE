@@ -40,9 +40,7 @@ L'application utilise Flask pour le backend, SQLite pour le stockage, et une int
 2. **Accéder à l'interface** :
    Ouvrez votre navigateur et allez à `http://localhost:5000`.
 
-3. **Mode démo** (optionnel) :
-   - Dans `app.py`, changez `MODE_DEMO = False` en `MODE_DEMO = True` pour simuler des mesures sans connexion réseau.
-   - Relancez l'application.
+
 
 ## Fonctionnalités
 
